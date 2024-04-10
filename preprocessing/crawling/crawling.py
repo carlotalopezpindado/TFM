@@ -1,8 +1,9 @@
 import subprocess
 
-# cambiar directorio de trabajo antes de empezar para que se guarden ahi los datos!!
-
-archivo_comandos = "preprocessing/crawling/BOE.txt"
+import configparser
+config = configparser.ConfigParser()
+config.read('config.ini')
+archivo_comandos = config['crawling']['archivo_comandos']
 
 with open(archivo_comandos, "r") as archivo:
     i = 0
@@ -16,5 +17,3 @@ with open(archivo_comandos, "r") as archivo:
                 resultado = subprocess.run(comando, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             except subprocess.CalledProcessError as e:
                 continue
-
-print("Ejecución de ", i, " comandos completada")

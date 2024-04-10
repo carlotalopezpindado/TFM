@@ -1,14 +1,18 @@
 import pandas as pd
-from transformers import MarianMTModel, MarianTokenizer, AutoModelForSequenceClassification, AutoTokenizer
+from transformers import AutoModelForSequenceClassification, AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
+
+import configparser
+config = configparser.ConfigParser()
+config.read('config.ini')
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-model_name_translate = "Helsinki-NLP/opus-mt-es-en"
-tokenizer_translate = MarianTokenizer.from_pretrained(model_name_translate)
-model_translate = MarianMTModel.from_pretrained(model_name_translate).to(device)
+model_name_translate = config['classification']['Helsinki-NLP/opus-mt-es-en']
+tokenizer_translate = AutoTokenizer.from_pretrained(model_name_translate)
+model_translate = AutoModelForSeq2SeqLM.from_pretrained(model_name_translate).to(device)
 
-model_name_classify = "facebook/bart-large-mnli"
+model_name_classify = config['classification']['facebook/bart-large-mnli']
 tokenizer_classify = AutoTokenizer.from_pretrained(model_name_classify)
 model_classify = AutoModelForSequenceClassification.from_pretrained(model_name_classify).to(device)
 
@@ -22,12 +26,13 @@ def classify_text(text, labels):
     with torch.no_grad():
         logits = model_classify(**inputs).logits
     scores = torch.softmax(logits, dim=1)
-    results = sorted([(label, score.item()) for label, score in zip(labels, scores[0])], key=lambda x: x[1], reverse=True)  # Ajustado para incluir el primer score
+    results = sorted([(label, score.item()) for label, score in zip(labels, scores[0])], key=lambda x: x[1], reverse=True)  
     return results[0][0]  
 
-df = pd.read_parquet('data_clean.parquet')
+clean_data_path = config['classification']['clean_data_path']
+df = pd.read_parquet(clean_data_path)
 
-labels = ["Legislation and Regulation", "Public Administration and Procedures", "Education and Culture", "Economy and Finance"]
+labels = config['classification']['labels']
 
 classification_results = []
 
@@ -38,4 +43,4 @@ for index, row in df.iterrows():
     classification_results.append(classification_label)
 
 df['classification_result'] = classification_results
-df.to_parquet('data_classified.parquet')
+df.to_parquet('classified_data.parquet')

@@ -1,8 +1,12 @@
 import pandas as pd
 from transformers import BitsAndBytesConfig
-from llama_index.core import PromptTemplate, ServiceContext, VectorStoreIndex, Document
+from llama_index.core import PromptTemplate, Settings, VectorStoreIndex, Document
 from llama_index.llms.huggingface import HuggingFaceLLM
 import torch
+
+import configparser
+config = configparser.ConfigParser()
+config.read('config.ini')
 
 quantization_config = BitsAndBytesConfig( # configuración de cuantificación del modelo -> reduce tamaño y aumenta velocidad
     load_in_4bit=True,                    # carga el modelo en formato 4bits
@@ -25,51 +29,48 @@ def initialize_llm(english_label, system_prompt):
         "Asegúrate de incluir referencias al documento o documentos relevantes cuando sea posible. Responde siempre en español.\nPregunta: {query_str} [/INST] </s>\n"
     )
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    device_map = device if device == "cpu" else "auto"
+    temp = config['indexing']['temperature']
+    top_k = config['indexing']['top_k']
+    top_p = config['indexing']['top_p']
     
     llm = HuggingFaceLLM(                                                 # se carga el modelo desde hugging face
-        model_name = "mistralai/Mixtral-8x7B-Instruct-v0.1",              # modelo
-        tokenizer_name = "mistralai/Mixtral-8x7B-Instruct-v0.1",          # tokenizador
+        model_name = config['indexing']['indexing_model'],              # modelo
+        tokenizer_name = config['indexing']['indexing_model'],          # tokenizador
         query_wrapper_prompt = query_wrapper,                             # plantilla para envolver las consultas al modelo
-        context_window = 4096,                                            # tamaño máximo de la ventana de contexto que el modelo puede considerar para cada predicción
-        max_new_tokens = 1024,                                            # tokens que el modelo puede generar
+        context_window = config['indexing']['context_window'],                                            # tamaño máximo de la ventana de contexto que el modelo puede considerar para cada predicción
+        max_new_tokens = config['indexing']['max_new_tokens'],                                            # tokens que el modelo puede generar
         model_kwargs = {"quantization_config": quantization_config},      # configuración de cuantificación
-        generate_kwargs = {"temperature": 0.2, "top_k": 5, "top_p": 0.8}, # parámetros para la generación de texto
-        device_map = device_map,                                          # el modelo se distribuye automaticamente entre los dispositivos disponibles
+        generate_kwargs = {"temperature": temp, "top_k": top_k, "top_p": top_p}, # parámetros para la generación de texto
+        device_map = "auto",                                              # el modelo se distribuye automaticamente entre los dispositivos disponibles
         system_prompt = system_prompt
     )
     return llm
 
 
-def init_save_index(df, llm, save_dir, english_label):
+def init_save_index(docs, llm, save_dir, english_label):
     spanish_label = labels_dic[english_label]
-    service_context = ServiceContext.from_defaults(llm=llm, embed_model="BAAI/bge-m3")
-    docs = [Document(content=text) for text in df[df['classification_result'] == english_label]['text']]
-    vector_index = VectorStoreIndex.from_documents(docs, service_context=service_context)
+    Settings.llm = llm
+    Settings.embed_model = config['indexing']['embed_model'] 
+    
+    document_objects = [Document(doc_id=str(i), text=doc) for i, doc in enumerate(docs)]
+    print("Indexando")
+    vector_index = VectorStoreIndex.from_documents(document_objects)
+    print("Guardando")
     vector_index.storage_context.persist(persist_dir=f'{save_dir}/{spanish_label.replace(" ", "_").lower()}')
 
-df = pd.read_parquet('preprocessing/zeroshot-classification/classified_data.parquet')
+classified_data_path = config['indexing']['classified_data_path'] 
+df = pd.read_parquet(classified_data_path)
+grouped = df.groupby('classification_result')
 
-system_prompt = (
-    "Estás asistiendo en consultas sobre documentos del Boletín Oficial del Estado (BOE), clasificados en una de las siguientes categorías: "
-    "Legislación y Regulación, Administración Pública y Procedimientos o Educación y Cultura. Siempre responde en castellano con información "
-    "relevante y precisa. Utiliza únicamente la información contenida en los documentos disponibles. Si la información no está disponible o "
-    "la pregunta excede el alcance de tu conocimiento actual, informa al usuario de manera clara y directa, evitando especulaciones o suposiciones."
-)
+system_prompt = config['indexing']['system_prompt']
 
-labels = ["Legislation and Regulation", "Public Administration and Procedures", "Education and Culture"]
-service_context = ServiceContext.from_defaults(embed_model="BAAI/bge-m3")
+labels = config['classification']['labels']
 
-for label in labels:
-    print(label)
-    llm = initialize_llm(label, system_prompt)
-    init_save_index(df, llm, 'processing/indexes', label)
+for classification, group in grouped:
+    torch.cuda.empty_cache()
 
-# PARA VOLVER A CARGAR LOS ÍNDICES!!!
-
-# from llama_index.core import StorageContext, load_index_from_storage
-## rebuild storage context
-# storage_context = StorageContext.from_defaults(persist_dir="<persist_dir>")
-## load index
-# index = load_index_from_storage(storage_context)
+    print(classification)
+    documents = group['text'].tolist()
+    
+    llm = initialize_llm(classification, system_prompt)
+    init_save_index(documents, llm, 'processing/indexes', classification)
