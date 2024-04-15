@@ -1,5 +1,0 @@
-# Ignorar todos los archivos JSON
-*.json
-
-# Ignorar todos los archivos Parquet
-*.parquet

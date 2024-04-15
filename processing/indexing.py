@@ -62,7 +62,12 @@ classified_data_path = config['indexing']['classified_data_path']
 df = pd.read_parquet(classified_data_path)
 grouped = df.groupby('classification_result')
 
-system_prompt = config['indexing']['system_prompt']
+system_prompt = (
+    "Estás asistiendo en consultas sobre documentos del Boletín Oficial del Estado (BOE), clasificados en una de las siguientes categorías: "
+    "Legislación y Regulación, Administración Pública y Procedimientos o Educación y Cultura. Siempre responde en castellano con información "
+    "relevante y precisa. Utiliza únicamente la información contenida en los documentos disponibles. Si la información no está disponible o "
+    "la pregunta excede el alcance de tu conocimiento actual, informa al usuario de manera clara y directa, evitando especulaciones o suposiciones."
+)
 
 labels = config['classification']['labels']
 

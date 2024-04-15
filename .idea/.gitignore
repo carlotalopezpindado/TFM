@@ -1,3 +1,9 @@
 # Default ignored files
 /shelf/
 /workspace.xml
+
+# Ignorar todos los archivos JSON
+*.json
+
+# Ignorar todos los archivos Parquet
+*.parquet
