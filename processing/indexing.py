@@ -1,19 +1,31 @@
 import pandas as pd
 from transformers import BitsAndBytesConfig
-from llama_index.core import PromptTemplate, Settings, VectorStoreIndex, Document
+from llama_index.core import PromptTemplate, Settings, VectorStoreIndex, Document, StorageContext
 from llama_index.llms.huggingface import HuggingFaceLLM
+from llama_index.vector_stores.postgres import PGVectorStore
 import torch
-
+import psycopg2
+from sqlalchemy import make_url
 import configparser
+
+## ---------------- DATOS CONFIGURACIÓN INICIAL -------------------------
 config = configparser.ConfigParser()
 config.read('config.ini')
+temp = config['indexing']['temperature']
+top_k = config['indexing']['top_k']
+top_p = config['indexing']['top_p']
+connection_string = config['indexing']['postgres']
+db_name = config['indexing']['db_name']
+model_name = config['indexing']['indexing_model']
+context_window = config['indexing']['context_window']
+max_new_tokens = config['indexing']['max_new_tokens']
+embed_model = config['indexing']['embed_model']
+classified_data_path = config['indexing']['classified_data_path'] 
 
-quantization_config = BitsAndBytesConfig( # configuración de cuantificación del modelo -> reduce tamaño y aumenta velocidad
-    load_in_4bit=True,                    # carga el modelo en formato 4bits
-    bnb_4bit_compute_dtype=torch.float16, # más configuraciones relacionadas con eso
-    bnb_4bit_quant_type="nf4",
-    bnb_4bit_use_double_quant=True,
-)
+## ---------------- CONSTANTES ------------------------------------------
+quantization_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.float16, bnb_4bit_quant_type="nf4", bnb_4bit_use_double_quant=True)
+
+labels = ["Legislation and Regulation", "Public Administration and Procedures", "Education and Culture"] 
 
 labels_dic = {
     "Legislation and Regulation": "Regulación y Legislación",
@@ -21,61 +33,63 @@ labels_dic = {
     "Education and Culture": "Educación y Cultura"
 }
 
+system_prompt = """
+    Estas asistiendo a una persona española que no habla inglés, por lo que solo puedes responder en español. 
+    Estás asistiendo en consultas sobre documentos del Boletín Oficial del Estado (BOE), clasificados en una de las siguientes categorías: 
+    Legislación y Regulación, Administración Pública y Procedimientos o Educación y Cultura. Siempre responde en castellano con información 
+    relevante y precisa. Utiliza únicamente la información contenida en los documentos disponibles. Si la información no está disponible o 
+    la pregunta excede el alcance de tu conocimiento actual, informa al usuario de manera clara y directa, evitando especulaciones o suposiciones.
+    Responde con la información más actualizada que tengas acerca de la pregunta."""
+
+## ---------------------------------------------------------------------
 def initialize_llm(english_label, system_prompt):
-    spanish_label = labels_dic[english_label]  # etiqueta en español
+    spanish_label = labels_dic[english_label]  
     query_wrapper = PromptTemplate(
-        f"<s>[Consulta de {spanish_label}] {system_prompt} Dada la siguiente pregunta del usuario relacionada con la categoría {spanish_label} de documentos del BOE, "
-        "proporciona una respuesta detallada y específica utilizando la información contenida en los documentos. "
+        f"<s> [INST] [Consulta de {spanish_label}] {system_prompt} Dada la siguiente pregunta del usuario relacionada con la categoría {spanish_label} "
+        "de documentos del BOE, proporciona una respuesta detallada y específica utilizando la información contenida en los documentos. "
         "Asegúrate de incluir referencias al documento o documentos relevantes cuando sea posible. Responde siempre en español.\nPregunta: {query_str} [/INST] </s>\n"
     )
-
-    temp = config['indexing']['temperature']
-    top_k = config['indexing']['top_k']
-    top_p = config['indexing']['top_p']
     
-    llm = HuggingFaceLLM(                                                 # se carga el modelo desde hugging face
-        model_name = config['indexing']['indexing_model'],              # modelo
-        tokenizer_name = config['indexing']['indexing_model'],          # tokenizador
-        query_wrapper_prompt = query_wrapper,                             # plantilla para envolver las consultas al modelo
-        context_window = config['indexing']['context_window'],                                            # tamaño máximo de la ventana de contexto que el modelo puede considerar para cada predicción
-        max_new_tokens = config['indexing']['max_new_tokens'],                                            # tokens que el modelo puede generar
-        model_kwargs = {"quantization_config": quantization_config},      # configuración de cuantificación
-        generate_kwargs = {"temperature": temp, "top_k": top_k, "top_p": top_p}, # parámetros para la generación de texto
-        device_map = "auto",                                              # el modelo se distribuye automaticamente entre los dispositivos disponibles
+    llm = HuggingFaceLLM(                                                        
+        model_name = model_name,                                                 
+        tokenizer_name = model_name,                                             
+        query_wrapper_prompt = query_wrapper,                            
+        context_window = context_window,                                            
+        max_new_tokens = max_new_tokens,                                           
+        model_kwargs = {"quantization_config": quantization_config},      
+        generate_kwargs = {"temperature": temp, "top_k": top_k, "top_p": top_p}, 
+        device_map = "auto",                                              
         system_prompt = system_prompt
     )
     return llm
 
-
-def init_save_index(docs, llm, save_dir, english_label):
+def init_save_index(document_objects, llm, english_label):
     spanish_label = labels_dic[english_label]
     Settings.llm = llm
-    Settings.embed_model = config['indexing']['embed_model'] 
+    Settings.embed_model = embed_model 
     
-    document_objects = [Document(doc_id=str(i), text=doc) for i, doc in enumerate(docs)]
-    print("Indexando")
-    vector_index = VectorStoreIndex.from_documents(document_objects)
-    print("Guardando")
-    vector_index.storage_context.persist(persist_dir=f'{save_dir}/{spanish_label.replace(" ", "_").lower()}')
+    url = make_url(connection_string)
+    vector_store = PGVectorStore.from_params(database=db_name, host=url.host, password=url.password, port=url.port, user=url.username, table_name=spanish_label.replace(" ", "_").lower(), embed_dim=768, hybrid_search=True, text_search_config="spanish")
+    storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
-classified_data_path = config['indexing']['classified_data_path'] 
-df = pd.read_parquet(classified_data_path)
-grouped = df.groupby('classification_result')
+    print("Indexando y guardando")
+    VectorStoreIndex.from_documents(document_objects, storage_context=storage_context, show_progress=True)
+                
+def main():       
+    conn = psycopg2.connect(connection_string)
+    conn.autocommit = True 
+            
+    df = pd.read_parquet(classified_data_path)
+    grouped = df.groupby('classification_result')
 
-system_prompt = (
-    "Estás asistiendo en consultas sobre documentos del Boletín Oficial del Estado (BOE), clasificados en una de las siguientes categorías: "
-    "Legislación y Regulación, Administración Pública y Procedimientos o Educación y Cultura. Siempre responde en castellano con información "
-    "relevante y precisa. Utiliza únicamente la información contenida en los documentos disponibles. Si la información no está disponible o "
-    "la pregunta excede el alcance de tu conocimiento actual, informa al usuario de manera clara y directa, evitando especulaciones o suposiciones."
-)
-
-labels = config['classification']['labels']
-
-for classification, group in grouped:
-    torch.cuda.empty_cache()
-
-    print(classification)
-    documents = group['text'].tolist()
-    
-    llm = initialize_llm(classification, system_prompt)
-    init_save_index(documents, llm, 'processing/indexes', classification)
+    for classification, group in grouped:
+        print(classification)
+        documents = group[['url', 'text']].to_dict(orient='records')
+        
+        llm = initialize_llm(classification, system_prompt)
+        
+        document_objects = [Document(doc_id=doc['url'], text=doc['text']) for doc in documents]
+        init_save_index(document_objects, llm, classification)
+        
+if __name__ == "__main__":
+    main()

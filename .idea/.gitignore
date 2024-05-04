@@ -7,3 +7,5 @@
 
 # Ignorar todos los archivos Parquet
 *.parquet
+
+*.txt

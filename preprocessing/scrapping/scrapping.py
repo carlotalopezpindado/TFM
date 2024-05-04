@@ -4,12 +4,6 @@ from bs4 import BeautifulSoup, NavigableString, Comment
 import re
 import glob  
 
-import configparser
-config = configparser.ConfigParser()
-config.read('config.ini')
-
-data_path = config['scrapping']['data_path']
-
 def open_html(file_path):
     with open(file_path, 'r', encoding='utf-8') as f:
         html_content = f.read()
@@ -83,6 +77,13 @@ def html_to_text(soup):
     texto_normalizado=erase_empty_lines(texto)
     return texto_normalizado
 
+def extract_canonical_url(soup):
+    """Extrae el valor del atributo href de la etiqueta <link rel='canonical'>"""
+    canonical_tag = soup.find('link', rel='canonical')
+    if canonical_tag and canonical_tag.get('href'):
+        return canonical_tag['href']
+    return None
+
 def main_html_scrapping(soup):  
     content_l = erase_tags(soup)
     content_l = remove_isolated_links(content_l)
@@ -104,26 +105,27 @@ def main_html_scrapping(soup):
 def process_html_content(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
     texto = main_html_scrapping(soup)  
-    return texto
+    url = extract_canonical_url(soup)
+    return texto, url
 
 def process_html_from_directory(directory_path):
-    processed_texts = []
+    processed_data = []
     i = 0
     for file_path in glob.glob(os.path.join(directory_path, '*.html')):
-        i = i + 1
+        i += 1
         print(i)
         html_content = open_html(file_path)  
-        processed_text = process_html_content(html_content)
-        if processed_text != '': processed_texts.append(processed_text)
+        processed_text, url = process_html_content(html_content)
+        if processed_text != '': processed_data.append({'text': processed_text, 'url': url})
+        
+    return processed_data
 
-    return processed_texts
-
-def save_to_parquet(processed_texts, output_file_name):
-    df = pd.DataFrame(processed_texts, columns=['text'])
+def save_to_parquet(processed_data, output_file_name):
+    df = pd.DataFrame(processed_data)
     df.to_parquet(output_file_name, index=False)
 
 def main(directory_path, output_file_name):
-    processed_texts = process_html_from_directory(directory_path)
-    save_to_parquet(processed_texts, output_file_name)
+    processed_data = process_html_from_directory(directory_path)
+    save_to_parquet(processed_data, output_file_name)
 
-main('data', 'clean_data.parquet')
+main('preprocessing/crawling/data', 'preprocessing/scrapping/clean_data.parquet')

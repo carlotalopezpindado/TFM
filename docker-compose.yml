@@ -15,4 +15,7 @@ services:
     build: .
     depends_on:
       - mysql
-
+    device_requests:
+      - driver: nvidia
+        capabilities: [gpu]
+        count: 2  
