@@ -6,6 +6,7 @@ import torch
 import configparser
 from llama_index.core import VectorStoreIndex
 from llama_index.vector_stores.elasticsearch import ElasticsearchStore
+from elasticsearch import Elasticsearch
 
 ## ---------------- DATOS CONFIGURACIÓN INICIAL -------------------------
 config = configparser.ConfigParser()
@@ -58,8 +59,16 @@ def init_save_index(document_objects, llm, label):
     Settings.llm = llm
     Settings.embed_model = embed_model 
 
+    es_client = Elasticsearch(
+        hosts=["https://localhost:9200"],
+        basic_auth=("elastic", "qTIql*fRyWF*q=6OJBal"),  # Reemplaza con tus credenciales
+        verify_certs=False,
+        ssl_show_warn=False
+    )
+
+    # Use the Elasticsearch client in the vector store
     vector_store = ElasticsearchStore(
-        es_url="https://localhost:9200",
+        es_client=es_client,
         index_name=label.replace(" ", "_").lower()
     )
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
@@ -68,7 +77,7 @@ def init_save_index(document_objects, llm, label):
     VectorStoreIndex.from_documents(document_objects, storage_context=storage_context, show_progress=True)
                 
 def main():       
-    df = pd.read_parquet('preprocessing/zeroshot-classification/classified_data.parquet')
+    df = pd.read_parquet('classified_data.parquet')
     grouped = df.groupby('classification_result')
 
     for classification, group in grouped:
