@@ -1,0 +1,11 @@
+mysql-connector-python
+configparser
+sqlalchemy
+transformers
+torch
+llama_index
+faiss-cpu
+pymysql
+llama-index-vector-stores-faiss
+llama-index-llms-huggingface
+cryptography

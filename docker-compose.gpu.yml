@@ -1,0 +1,29 @@
+version: '3.7' # version del docker compose
+services: # servicios que se ejecutan dentro del entorno del docker compose
+  mysql: # nombre que yo le doy al servicio
+    build: # instrucciones para la construccion del contenedor
+      context: ./mysql_database # directorio con el dockerfile para la construccion del contenedor
+      args:
+        - MYSQL_DATABASE=tfm
+        - MYSQL_ROOT_USER=root
+        - MYSQL_ROOT_PASSWORD=1234
+    ports:
+      - "3306:3306"
+    volumes: # Monta el archivo de inicialización init_db.sql dentro del contenedor para que MySQL lo ejecute al iniciarse.
+      - ./mysql_database/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+  
+  indices:
+    build: .
+    depends_on:
+      - mysql
+    environment:
+      - USERNAME
+      - PASSWORD
+      - USER_ROLE
+    env_file:
+      - ./credentials.env
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
