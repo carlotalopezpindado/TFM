@@ -18,4 +18,4 @@ COPY app/main.py /app/main.py
 WORKDIR /app
 
 # Comando modificado para esperar a MySQL y ejecutar main.py
-CMD ["sh", "-c", "until nc -z mysql 3306; do echo waiting for mysql; sleep 1; done; python main.py"]
+CMD ["sh", "-c", "until nc -z mysql 3306; do echo waiting for mysql; sleep 1; done; streamlit run main.py"]
