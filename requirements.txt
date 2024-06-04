@@ -1,7 +1,7 @@
 mysql-connector-python
 configparser
 sqlalchemy
-transformers
+transformers>=4.40.0
 torch
 llama_index
 faiss-cpu
@@ -9,3 +9,8 @@ pymysql
 llama-index-vector-stores-faiss
 llama-index-llms-huggingface
 cryptography
+streamlit
+streamlit_chat
+bitsandbytes
+huggingface_hub
+accelerate
