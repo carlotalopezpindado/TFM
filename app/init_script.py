@@ -6,9 +6,22 @@ from llama_index.llms.huggingface import HuggingFaceLLM
 import torch
 from huggingface_hub import login
 
+config = configparser.ConfigParser()
+config.read('config.ini')
+
+hf_key = config['keys']['huggingface']
+model_name = config['indexing']['indexing_model']
+context_window = int(config['indexing']['context_window'])
+max_new_tokens = int(config['indexing']['max_new_tokens'])
+temp = float(config['indexing']['temperature'])
+top_k = int(config['indexing']['top_k'])
+top_p = float(config['indexing']['top_p'])
+embed_model = config['indexing']['embed_model']
+
 global llm, index_dict
 
 def init_llm():
+    login(hf_key)
     quantization_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.float16, bnb_4bit_quant_type="nf4", bnb_4bit_use_double_quant=True)
 
     system_prompt = """
@@ -68,17 +81,6 @@ def load_indices():
         storage_context = StorageContext.from_defaults(vector_store=vector_store, persist_dir=f"indexes/{role}")
         indices[role] = load_index_from_storage(storage_context=storage_context, service_context=ServiceContext.from_defaults(llm=llm, embed_model=embed_model))
     return indices
-
-config = configparser.ConfigParser()
-config.read('config.ini')
-
-model_name = config['indexing']['indexing_model']
-context_window = int(config['indexing']['context_window'])
-max_new_tokens = int(config['indexing']['max_new_tokens'])
-temp = float(config['indexing']['temperature'])
-top_k = int(config['indexing']['top_k'])
-top_p = float(config['indexing']['top_p'])
-embed_model = config['indexing']['embed_model']
 
 llm = init_llm()
 index_dict = load_indices()
