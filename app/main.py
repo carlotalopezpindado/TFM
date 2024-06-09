@@ -34,7 +34,7 @@ def main():
         st.session_state['page'] = 'login'
 
     if st.session_state['page'] == 'login':
-        show_login(llm)
+        show_login()
     elif st.session_state['page'] == 'chat':
         show_chat()
 

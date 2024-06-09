@@ -77,8 +77,8 @@ def load_indices():
     indices = {}
     roles = ['leg', 'edu', 'adm']
     for role in roles:
-        vector_store = FaissVectorStore.from_persist_dir(f"indexes/{role}")
-        storage_context = StorageContext.from_defaults(vector_store=vector_store, persist_dir=f"indexes/{role}")
+        vector_store = FaissVectorStore.from_persist_dir(f"processing/indexes/{role}")
+        storage_context = StorageContext.from_defaults(vector_store=vector_store, persist_dir=f"processing/indexes/{role}")
         indices[role] = load_index_from_storage(storage_context=storage_context, service_context=ServiceContext.from_defaults(llm=llm, embed_model=embed_model))
     return indices
 
