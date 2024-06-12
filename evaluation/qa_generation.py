@@ -3,16 +3,16 @@ import random
 import os
 from langchain_community.document_loaders import TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain.chains import QAGenerationChain
 from gptcache.adapter.langchain_models import LangChainChat
 from gptcache import cache
 import configparser
+import shutil
 
 config = configparser.ConfigParser()
 config.read('config.ini')
-
-openai_key = config['keys']['openain']
+openai_key = config['keys']['openai']
 
 def get_msg_func(data, **_):
     return data.get("messages")[-1].content
@@ -23,7 +23,7 @@ df = pd.read_parquet('classified_data.parquet')
 
 os.makedirs('temp_texts', exist_ok=True)
 
-def guardar_textos_temporales(df, categoria, n=30):
+def guardar_textos_temporales(df, categoria, n=100):
     textos_categoria = df[df['classification_result'] == categoria]['text'].tolist()
     textos_seleccionados = random.sample(textos_categoria, n)
     archivos = []
@@ -47,17 +47,15 @@ def generar_preguntas_respuestas(archivos):
         fragmento = random.choice(texts)
         qa = chain.invoke(fragmento.page_content)
         if 'questions' in qa and qa['questions']:
-            pares_qa.append({'question': qa['questions'][0]['question'], 'answer': qa['questions'][0]['answer']})
+            pares_qa.append({'question': qa['questions'][0]['pregunta'], 'answer': qa['questions'][0]['respuesta']})
     return pares_qa
 
 categorias = df['classification_result'].unique()
-preguntas_respuestas = []
+
 for categoria in categorias:
     archivos = guardar_textos_temporales(df, categoria)
-    preguntas_respuestas.extend(generar_preguntas_respuestas(archivos))
+    preguntas_respuestas = generar_preguntas_respuestas(archivos)
+    df_qa = pd.DataFrame(preguntas_respuestas)
+    df_qa.to_csv(f'evaluation/qa_{categoria}.csv', index=False)
 
-df_qa = pd.DataFrame(preguntas_respuestas)
-df_qa.to_csv('qa.csv', index=False)
-
-import shutil
 shutil.rmtree('temp_texts')
