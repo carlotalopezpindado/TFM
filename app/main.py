@@ -31,15 +31,15 @@ DATABASE_URL = f"mysql+pymysql://{user}:{password}@{host}:{port}/{database}"
 # para usar en local
 # DATABASE_URL = f"mysql+pymysql://{user}:{password}@localhost:{port}/{database}"
 
-# def get_user_role(username, password):
-#     engine = create_engine(DATABASE_URL)
-#     metadata = MetaData()
-#     users = Table('users', metadata, autoload_with=engine)
-#     conn = engine.connect()
-#     query = users.select().where(users.c.UserName == username).where(users.c.Password == password)
-#     result = conn.execute(query).fetchone()
-#     conn.close()
-#     return result.Rol if result else None
+def get_user_role(username, password):
+    engine = create_engine(DATABASE_URL)
+    metadata = MetaData()
+    users = Table('users', metadata, autoload_with=engine)
+    conn = engine.connect()
+    query = users.select().where(users.c.UserName == username).where(users.c.Password == password)
+    result = conn.execute(query).fetchone()
+    conn.close()
+    return result.Rol if result else None
 
 def init_llm():
     login(hf_key)
@@ -83,7 +83,7 @@ def init_llm():
     query_wrapper = PromptTemplate(
         f"<s> [INST] {system_prompt} Dada la siguiente pregunta del usuario, proporciona una respuesta detallada y específica utilizando" 
         "la información contenida en los documentos. Responde en el idioma en el que se te realice la pregunta"
-        "Asegúrate de incluir referencias al documento o documentos relevantes cuando sea posible.\nPregunta: {{query_str}} [/INST] </s>\n"
+        "Asegúrate de incluir referencias al documento o documentos relevantes cuando sea posible.\nPregunta: {query_str} [/INST] </s>\n"
     )
 
     llm = HuggingFaceLLM(                                                        
@@ -94,7 +94,7 @@ def init_llm():
         max_new_tokens=max_new_tokens,                                           
         model_kwargs={"quantization_config": quantization_config},      
         generate_kwargs={"do_sample": True, "temperature": temp, "top_k": top_k, "top_p": top_p}, 
-        device_map="auto",  # Ensuring that the model is loaded entirely on the GPU
+        device_map="auto",  
         system_prompt=system_prompt
     )
     return llm
@@ -125,8 +125,8 @@ def show_login():
     password = st.text_input("Contraseña", type="password")
 
     if st.button("Iniciar sesión"):
-        #role = get_user_role(username, password)
-        role = 'adm'
+        role = get_user_role(username, password)
+        print(role)
         if role is not None:
             index = load_index(role)
             st.session_state['query_engine'] = index.as_query_engine(llm=st.session_state.llm, response_mode="compact")
@@ -147,7 +147,13 @@ def show_chat():
         if message_data["role"] == "user":
             message(message_data["content"], is_user=True)
         else:
-            message(message_data["content"], is_user=False)
+            bot_content = message_data['content'].replace('\n', '<br>')
+            bot_message = f"""
+            <div style="color: black; background-color: #fafafa; padding: 10px; border-radius: 10px;">
+                <p>{bot_content}</p>
+            </div>
+            """
+            st.markdown(bot_message, unsafe_allow_html=True)
 
     user_query = st.text_input("Introduzca su consulta:", key="query_input")
 

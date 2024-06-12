@@ -14,3 +14,4 @@ streamlit_chat
 bitsandbytes
 huggingface_hub
 accelerate
+llama-index-embeddings-huggingface

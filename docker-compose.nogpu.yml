@@ -16,7 +16,5 @@ services: # servicios que se ejecutan dentro del entorno del docker compose
     build: .
     depends_on:
       - mysql
-    devices:
-      - "/dev/ttyS0:/dev/ttyS0"
     ports:
       - "8501:8501"
