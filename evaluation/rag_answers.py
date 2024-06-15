@@ -105,4 +105,4 @@ for index, row in df.iterrows():
     print('\n---------------------------------------------------------\n')
 
 output_file_path = 'evaluation/rag_ans/rag_adm.csv'
-responder.to_csv(output_file_path, index=False)
+respuestas.to_csv(output_file_path, index=False)

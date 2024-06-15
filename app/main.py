@@ -136,7 +136,7 @@ def show_login():
             st.error("Nombre de usuario o contraseña incorrecto")
 
 def show_chat():
-    st.title("Chatbot - BOE")
+    st.title("BOEBot")
 
     if 'messages' not in st.session_state:
         st.session_state['messages'] = []
@@ -163,8 +163,10 @@ def show_chat():
             with st.spinner("Generando respuesta..."):
                 response = query_engine.query(user_query)
                 st.session_state['messages'].append({"role": "bot", "content": str(response)})
-                url = response.metadata[0]['filename']
-                st.session_state['messages'].append({"role": "bot", "content": 'Para más información consulte: ' + url})
+                
+                metadata = response.metadata
+                first_url = next(iter(metadata.values()))['filename']
+                st.session_state['messages'].append({"role": "bot", "content": f'Para más información, consulte: [aquí]({first_url})'})
 
                 st.rerun()
 
