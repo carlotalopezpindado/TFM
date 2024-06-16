@@ -10,12 +10,12 @@ from huggingface_hub import login
 config = configparser.ConfigParser()
 config.read('config.ini')
 
-file_path = 'evaluation/qas/qa_adm.csv'
+file_path = 'evaluation/qas/qa_edu.csv'
 df = pd.read_csv(file_path)
 
 model_name = config['indexing']['indexing_model']
 context_window = int(config['indexing']['context_window'])
-max_new_tokens = 256
+max_new_tokens = int(config['indexing']['max_new_tokens'])
 temp = float(config['indexing']['temperature'])
 top_k = int(config['indexing']['top_k'])
 top_p = float(config['indexing']['top_p'])
@@ -82,8 +82,8 @@ def init_llm():
     return llm
 
 def load_index():
-    vector_store = FaissVectorStore.from_persist_dir(f"processing/indexes/adm")
-    storage_context = StorageContext.from_defaults(vector_store=vector_store, persist_dir=f"processing/indexes/adm")
+    vector_store = FaissVectorStore.from_persist_dir(f"processing/indexes/edu")
+    storage_context = StorageContext.from_defaults(vector_store=vector_store, persist_dir=f"processing/indexes/edu")
     index = load_index_from_storage(storage_context=storage_context, service_context=ServiceContext.from_defaults(llm=llm, embed_model=embed_model))
     return index
 
@@ -91,18 +91,17 @@ def responder(question):
     response = qe.query(question)
     return response
 
-    
 llm = init_llm()
     
 index = load_index()
 qe = index.as_query_engine(llm=llm, response_mode="compact")
-            
+        
 respuestas = pd.DataFrame()
 for index, row in df.iterrows():
     respuesta = responder(row['question'])
-    respuestas.append(respuesta)
-    print(respuesta)
-    print('\n---------------------------------------------------------\n')
+    respuesta = str(respuesta).replace('\n', ' ').replace(',', ' ')
+    respuestas = pd.concat([respuestas, pd.DataFrame({'response': [respuesta]})], ignore_index=True)
+    print(index)
 
-output_file_path = 'evaluation/rag_ans/rag_adm.csv'
-respuestas.to_csv(output_file_path, index=False)
+output_file_path = 'evaluation/rag_ans/rag_edu.parquet'
+respuestas.to_parquet(output_file_path, index=False)
