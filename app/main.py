@@ -126,7 +126,6 @@ def show_login():
 
     if st.button("Iniciar sesión"):
         role = get_user_role(username, password)
-        print(role)
         if role is not None:
             index = load_index(role)
             st.session_state['query_engine'] = index.as_query_engine(llm=st.session_state.llm, response_mode="compact")
@@ -160,15 +159,19 @@ def show_chat():
     if st.button("Consultar"):
         if user_query:
             st.session_state['messages'].append({"role": "user", "content": user_query})
-            with st.spinner("Generando respuesta..."):
-                response = query_engine.query(user_query)
-                st.session_state['messages'].append({"role": "bot", "content": str(response)})
-                
-                metadata = response.metadata
-                first_url = next(iter(metadata.values()))['filename']
-                st.session_state['messages'].append({"role": "bot", "content": f'Para más información, consulte: [aquí]({first_url})'})
+            st.experimental_rerun()
 
-                st.rerun()
+    if st.session_state['messages'] and st.session_state['messages'][-1]["role"] == "user":
+        user_query = st.session_state['messages'][-1]["content"]
+        with st.spinner("Generando respuesta..."):
+            response = query_engine.query(user_query)
+            st.session_state['messages'].append({"role": "bot", "content": str(response)})
+
+            metadata = response.metadata
+            first_url = next(iter(metadata.values()))['filename']
+            st.session_state['messages'].append({"role": "bot", "content": f'Para más información, consulte: [aquí]({first_url})'})
+
+        st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
