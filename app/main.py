@@ -169,7 +169,8 @@ def show_chat():
 
             metadata = response.metadata
             first_url = next(iter(metadata.values()))['filename']
-            st.session_state['messages'].append({"role": "bot", "content": f'Para más información, consulte: [aquí]({first_url})'})
+            clickable_link = f'<a href="{first_url}" target="_blank">aquí</a>'
+            st.session_state['messages'].append({"role": "bot", "content": f'Para más información, puede consultar {clickable_link}'})
 
         st.experimental_rerun()
 
