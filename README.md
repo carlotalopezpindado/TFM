@@ -29,10 +29,14 @@ After this has been done, the project can be started following these comands:
 
     ```bash
     command: docker-compose -f docker-compose.gpu.yml build
+    ```
+
+    ```bash
     command: docker-compose -f docker-compose.gpu.yml up
     ```
 
 ## Code structure
+```bash
 TFM/
 ├── Dockerfile
 ├── LICENSE
@@ -84,7 +88,7 @@ TFM/
 │   └── zeroshot-classification/
 │       └── zeroshot-classification.py
 └── requirements.txt
-
+```
 
 ## License
 This project is licensed under the MIT License - see the `LICENSE` file for details.
