@@ -27,13 +27,13 @@ In order to deploy the sistem it is first necessary to download the necessary fi
 
 After this has been done, the project can be started following these comands:
 
-    ```bash
-    command: docker-compose -f docker-compose.gpu.yml build
-    ```
+```bash
+docker-compose -f docker-compose.gpu.yml build
+```
 
-    ```bash
-    command: docker-compose -f docker-compose.gpu.yml up
-    ```
+```bash
+docker-compose -f docker-compose.gpu.yml up
+```
 
 ## Code structure
 ```bash
